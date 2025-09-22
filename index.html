@@ -182,6 +182,41 @@
     transform-origin: 50% 50%;
     z-index: 1; /* 겹침 우선 */
   }
+
+  .prob-panel {
+    position: fixed;     
+    top: 40px;
+    right: 40px;
+    width: 300px;             /* 패널 자체 가로폭 */
+    background: #fff;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    padding: 16px;            /* 안쪽 여백 늘리기 */
+    font-size: 1rem;          /* 라벨 글씨 크기 (14px → 약 16px) */
+    box-shadow: 0 2px 6px rgba(0,0,0,.1);
+    z-index: 100;
+  }
+
+  .prob-panel h3 {
+    margin: 0 0 10px;
+    font-size: 1.2rem;        /* 제목 글씨 조금 키우기 */
+  }
+
+  .prob-panel .row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin: 6px 0;            /* 행 사이 간격 */
+  }
+
+  .prob-panel input {
+    width: 110px;             /* 입력칸 가로폭 */
+    height: 38px;             /* 세로 높이 */
+    padding: 4px 6px;         /* 안쪽 여백 */
+    font-size: 1.1rem;        /* 입력 글씨 크기 */
+    box-sizing: border-box;
+  }
+
 </style>
 </head>
 <body>
@@ -217,6 +252,17 @@
     <button id="btnCopy" style="background:#16a34a">값 복사</button>
     <small>저장은 자동(브라우저 로컬). 가이드선은 위치조정 ON일 때 보입니다.</small>
   </div>
+</div>
+
+<div class="prob-panel" id="probPanel">
+  <h3>🎲 확률 조정</h3>
+  <div class="row"><label>꽝 확률(%)</label><input type="number" id="prob-miss" value="86"></div>
+  <div class="row"><label>치킨 x3 (%)</label><input type="number" id="prob-chicken" value="3"></div>
+  <div class="row"><label>커피 x3 (%)</label><input type="number" id="prob-coffee" value="3"></div>
+  <div class="row"><label>코인 x3 (%)</label><input type="number" id="prob-coin" value="4"></div>
+  <div class="row"><label>다혜 x3 (%)</label><input type="number" id="prob-dahye" value="1.5"></div>
+  <div class="row"><label>폭탄 x3 (%)</label><input type="number" id="prob-bomb" value="1.5"></div>
+  <div class="row"><label>7 x3 (%)</label><input type="number" id="prob-seven" value="1"></div>
 </div>
 
 <script>
@@ -406,10 +452,18 @@ function cycleReelTo(idx, key, _unusedMs, done){
 }
 
 function drawOutcome(d){
-  const sumWins=Object.values(d.wins).reduce((a,b)=>a+b,0), r=Math.random()*100;
-  if(r<=sumWins){ const rr=Math.random()*sumWins; let acc=0; for(const k of Object.keys(d.wins)){ acc+=d.wins[k]; if(rr<=acc) return {type:'win',symbol:k}; } }
-  return {type:'miss'};
+  const sumWins = Object.values(d.wins).reduce((a,b)=>a+b,0);
+  const r = Math.random() * 100;
+  if (r < d.miss) return { type:'miss' };
+  // 남은 구간(100 - miss)에서 win 심볼 가중 추출
+  let rr = Math.random() * sumWins;
+  for (const k of Object.keys(d.wins)){
+    rr -= d.wins[k];
+    if (rr <= 0) return { type:'win', symbol:k };
+  }
+  return { type:'miss' }; // fallback
 }
+
 function drawMissTriple(){
   const pick=()=>SYMBOLS[Math.floor(Math.random()*SYMBOLS.length)].key;
   let a=pick(),b=pick(),c=pick();
@@ -491,6 +545,90 @@ window.addEventListener('load', () => {
     reel.appendChild(strip);
   });
 });
+
+const fields = [
+  {id:'prob-miss', key:'miss'},
+  {id:'prob-chicken', key:'chicken'},
+  {id:'prob-coffee', key:'coffee'},
+  {id:'prob-coin', key:'coin'},
+  {id:'prob-dahye', key:'dahye'},
+  {id:'prob-bomb', key:'bomb'},
+  {id:'prob-seven', key:'seven'}
+];
+
+fields.forEach(f=>{
+  const el = document.getElementById(f.id);
+
+  // Enter 눌렀을 때만 보정 실행
+  el.addEventListener('keyup', e=>{
+    if(e.key === 'Enter'){
+      adjustProbs(f.key);  // 입력한 필드만 고정, 나머지 비율 조정
+      el.blur();           // 포커스 빼기(선택)
+    }
+  });
+});
+
+function adjustProbs(changedKey){
+  // 1) 현재 값 읽기
+  const arr = fields.map(f => ({
+    key: f.key,
+    el : document.getElementById(f.id),
+    val: parseFloat(document.getElementById(f.id).value)
+  })).map(x => ({ ...x, val: isNaN(x.val) ? 0 : x.val }));
+
+  // 2) 선택된 값 & 나머지
+  const changed = arr.find(x => x.key === changedKey);
+  const others  = arr.filter(x => x.key !== changedKey);
+
+  // 2-1) 입력값 범위 클램프 (즉시 UI 반영)
+  let changedVal = Math.max(0, Math.min(100, changed.val));
+  changed.val = changedVal;               // 내부 값 갱신
+  changed.el.value = changedVal.toFixed(2); // UI 즉시 고정
+
+  // 3) 나머지 합을 'remain'에 맞추도록 비례 스케일
+  let sumOthers = others.reduce((a,b)=>a + b.val, 0);
+  const remain  = 100 - changedVal;
+
+  if (others.length === 0){
+    // 항목이 1개뿐이면 그대로 끝
+  } else if (sumOthers <= 0){
+    // 나머지가 전부 0이거나 음수면 균등 분배
+    const per = remain / others.length;
+    others.forEach(o => { o.val = Math.max(0, per); });
+  } else {
+    const ratio = remain / sumOthers;  // remain이 작으면 축소, 크면 확대
+    others.forEach(o => { o.val = Math.max(0, o.val * ratio); });
+  }
+
+  // 4) 반올림 후 총합 100%로 미세 보정(부동소수/반올림 오차 제거)
+  //    - 가장 값이 큰 항목(보통 miss)에 델타를 몰아준다.
+  const after = [changed, ...others];
+  // 표시용으로 먼저 반올림
+  after.forEach(o => o.el.value = o.val.toFixed(2));
+  // 실제 값은 소수 그대로 가지고 총합 보정
+  let total = after.reduce((a,b)=>a + b.val, 0);
+  const delta = 100 - total;                 // 남거나 모자란 양
+  if (Math.abs(delta) > 1e-9){
+    // 보정 대상: 가장 큰 값(없으면 첫 번째)
+    let target = after.reduce((m, x) => x.val > m.val ? x : m, after[0]);
+    target.val = Math.max(0, target.val + delta);
+    target.el.value = target.val.toFixed(2);
+  }
+
+  // 5) dist 갱신
+  updateDistFromArray(after);
+}
+
+function updateDistFromArray(arr){
+  dist.miss         = arr.find(x=>x.key==='miss').val;
+  dist.wins.chicken = arr.find(x=>x.key==='chicken').val;
+  dist.wins.coffee  = arr.find(x=>x.key==='coffee').val;
+  dist.wins.coin    = arr.find(x=>x.key==='coin').val;
+  dist.wins.dahye   = arr.find(x=>x.key==='dahye').val;
+  dist.wins.bomb    = arr.find(x=>x.key==='bomb').val;
+  dist.wins.seven   = arr.find(x=>x.key==='seven').val;
+}
+
 </script>
 </body>
 </html>
