@@ -16,6 +16,7 @@
     --STATUS_TOP:  74.6%;      /* Y 좌표: 프레임 높이 대비 */
     --STATUS_W:    375px;    /* 박스 너비 */
     --STATUS_H:    130px;     /* 박스 높이 */
+    --s: 1;    /* 스케일러 */
   }
 
   html,body{height:100%;margin:0;background:#fff4e0;font-family:system-ui,Pretendard,Noto Sans KR,sans-serif}
@@ -30,7 +31,14 @@
   padding: 16px 12px;             /* 가장자리 여백 (작은 화면 보호) */
   background: #ffffff;            /* 기존 배경 유지 */
   }
-  
+  #stage{
+    width:750px;
+    height:1200px;
+    position:absolute;
+    left:50%; top:54%;
+    transform:translate(-50%,-50%) scale(var(--s));
+    transform-origin:50% 50%;
+  }
   .slot-wrap{
     position: relative;
     width: min(95vw, 750px);
@@ -178,22 +186,23 @@
 </head>
 <body>
 
-<div class="slot-wrap" id="wrap">
-  <img class="slot-frame" src="KakaoTalk_20250919_112415354.png" alt="frame">
+<div id="stage">
+  <div class="slot-wrap" id="wrap">
+    <img class="slot-frame" src="KakaoTalk_20250919_112415354.png" alt="frame">
 
-  <!-- 릴(카드) 3개 -->
-  <div class="reel r0" id="reel0"></div>
-  <div class="reel r1" id="reel1"></div>
-  <div class="reel r2" id="reel2"></div>
+    <!-- 릴(카드) 3개 -->
+    <div class="reel r0" id="reel0"></div>
+    <div class="reel r1" id="reel1"></div>
+    <div class="reel r2" id="reel2"></div>
 
-  <div class="status-box" id="statusBox">
-    <div class="status" id="status">READY</div>
+    <div class="status-box" id="statusBox">
+      <div class="status" id="status">READY</div>
+    </div>
   </div>
-</div>
 
-<div class="ctrl">
-  <button id="btn">START</button>
-  <div class="status" id="status">READY</div>
+  <div class="ctrl">
+    <button id="btn">START</button>
+  </div>
 </div>
 
 <!-- 위치 조정 패널 -->
@@ -211,6 +220,24 @@
 </div>
 
 <script>
+const BASE_W=900, BASE_H=1200, SCALE_BIAS=0.96;
+function viewportSize(){
+  const vv=window.visualViewport;
+  return vv ? {w:vv.width*vv.scale, h:vv.height*vv.scale} :
+               {w:window.innerWidth, h:window.innerHeight};
+}
+function fit(){
+  const {w,h}=viewportSize();
+  const raw=Math.min(w/BASE_W,h/BASE_H);
+  document.documentElement.style.setProperty('--s', Math.min(raw*SCALE_BIAS,2));
+}
+window.addEventListener('resize',fit);
+if(window.visualViewport){
+  visualViewport.addEventListener('resize',fit);
+  visualViewport.addEventListener('scroll',fit);
+}
+fit();
+
 let finalKeys = [null, null, null];
 // ===== 스핀/감속 설정 =====
 const SPIN_TIME_BASE = 3000;   // 1번 릴의 빠른 회전 유지 시간(ms)
@@ -281,7 +308,7 @@ function status(msg,win){ statusEl.textContent=msg; if (win === true) statusEl.c
 function labelOf(key){ return SYMBOLS.find(s=>s.key===key)?.label||key; }
 function cycleReelTo(idx, key, _unusedMs, done){
   const reel = reels[idx];
-  const H = reel.getBoundingClientRect().height;
+  const H = reel.offsetHeight;
 
   // ── PHASE A: 빠른 연속 회전(유지) — requestAnimationFrame로 무한 스크롤
   // stripLoop: 랜덤 아이템 여러 개를 쌓아 위→아래로 흐르게 만들고, 맨 위가 지나가면 뒤에 다시 붙임
@@ -323,7 +350,7 @@ function cycleReelTo(idx, key, _unusedMs, done){
       stripLoop.insertBefore(el, stripLoop.firstChild);
     }
 
-    stripLoop.style.transform = `translate3d(0, ${y - H/2}px, 0)`;
+    stripLoop.style.transform = `translateY(${Math.round(y)}px) translateY(${-H/2}px)`;
 
     if(now < spinEndAt){
       rafId = requestAnimationFrame(tick);
@@ -363,7 +390,7 @@ function cycleReelTo(idx, key, _unusedMs, done){
     const lead  = H * 4; // 감속 전에 더 많이 내려오게(원하면 2~6H로 조절)
 
     stripStop.style.transition = 'none';
-    stripStop.style.transform  = `translate3d(0, ${-total - lead}px, 0)`; // 위에서 시작(중앙 보정 포함)
+    stripStop.style.transform = `translateY(${Math.round(-total)}px) translateY(${-H/2}px)`;
 
     requestAnimationFrame(()=>{
       stripStop.style.transition = `transform ${dur}ms cubic-bezier(.08,.9,.18,1)`;
@@ -449,7 +476,7 @@ function copyVars(){
 }
 window.addEventListener('load', () => {
   reels.forEach(reel => {
-    const H = reel.getBoundingClientRect().height;
+    const H = reel.offsetHeight;
     const strip = document.createElement('div');
     strip.className = 'strip';
     strip.style.setProperty('--H', H + 'px');
@@ -467,4 +494,3 @@ window.addEventListener('load', () => {
 </script>
 </body>
 </html>
-
