@@ -182,40 +182,87 @@
     transform-origin: 50% 50%;
     z-index: 1; /* 겹침 우선 */
   }
-
-  .prob-panel {
-    position: fixed;     
-    top: 40px;
-    right: 40px;
-    width: 300px;             /* 패널 자체 가로폭 */
-    background: #fff;
-    border: 1px solid #ddd;
-    border-radius: 8px;
-    padding: 16px;            /* 안쪽 여백 늘리기 */
-    font-size: 1rem;          /* 라벨 글씨 크기 (14px → 약 16px) */
-    box-shadow: 0 2px 6px rgba(0,0,0,.1);
-    z-index: 100;
+  .weight-panel{
+    position: fixed; top: 40px; right: 40px;
+    width: 360px; background:#fff; border:1px solid #ddd; border-radius:10px;
+    padding:16px; box-shadow:0 3px 8px rgba(0,0,0,.12); z-index:100; font-size:16px;
   }
-
-  .prob-panel h3 {
-    margin: 0 0 10px;
-    font-size: 1.2rem;        /* 제목 글씨 조금 키우기 */
+  .weight-panel h3{ margin:0 0 10px; font-size:18px; }
+  .weight-panel .row{
+    display:grid;
+    grid-template-columns: 1fr auto auto; /* 왼쪽: name / 가운데: wwrap / 오른쪽: pct */
+    align-items:center;
+    margin:15px 0; padding:4px 0;
+    column-gap:16px;                     /* ← name~x1, x1~% 사이 여백 */
   }
-
-  .prob-panel .row {
-    display: flex;
-    justify-content: space-between;
+  .weight-panel .row:last-child{ border-bottom:0; }
+  .weight-panel .name{ justify-self: start; }
+  .weight-panel .btn{
+    width:42px; height:38px; border-radius:8px; border:1px solid #ddd; background:#f7f7f7; cursor:pointer;
+  }
+  /* x1 자체를 왼쪽에 딱 붙이기 */
+  .weight-panel .w{
+    min-width: 48px;                     /* 너무 넓어서 우측에 붙던 것 줄이기 */
+    text-align: left;                    /* ← right → left */
+  }
+  .weight-panel .w:focus{ border-color:#60a5fa; box-shadow:0 0 0 3px #93c5fd55; }
+  .weight-panel .x{ opacity:.7; }
+  /* 확률은 오른쪽 끝에 고정 */
+  .weight-panel .pct{
+    justify-self: end;
+    min-width: 60px;
+    text-align: right;
+  }
+  .weight-panel .help{ margin-top:10px; font-size:12px; opacity:.7; }
+  
+  /* x1 묶음: 가운데 정렬 → 왼쪽 정렬로 */
+  .weight-panel .wwrap{
+    justify-self: start;                 /* ← center → start */
+    position: relative;
+    display: inline-flex;
     align-items: center;
-    margin: 6px 0;            /* 행 사이 간격 */
+    font-weight:500;
   }
 
-  .prob-panel input {
-    width: 110px;             /* 입력칸 가로폭 */
-    height: 38px;             /* 세로 높이 */
-    padding: 4px 6px;         /* 안쪽 여백 */
-    font-size: 1.1rem;        /* 입력 글씨 크기 */
-    box-sizing: border-box;
+  .weight-panel .updown {
+    position: absolute;
+    right: 5px;                 /* 숫자 오른쪽에 붙이기 */
+    top: 50%;
+    transform: translateY(-50%);
+    
+    display: flex;
+    flex-direction: column;       /* ← 핵심: 세로 배치 */
+    gap: 0px;
+
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .15s ease;
   }
+
+  /* 호버하면 나타남 */
+  .weight-panel .wwrap:hover .updown{
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  /* 작은 원형 버튼 */
+  .weight-panel .updown .btn {
+    width: 22px;
+    height: 22px;
+    border-radius: 999px;
+    border: 1px solid #cfcfcf;
+    background: #fff;
+    padding: 0;
+    cursor: pointer;
+    box-shadow: 0 1px 2px rgba(0,0,0,.08);
+
+    /* 글자 잘 보이게 */
+    font-size: 16px;       /* 크기 조정 */
+    font-weight: 500;     /* 굵게 */
+    line-height: 1;        /* 세로 가운데 */
+    color: #333;           /* 글자색 */
+  }
+  .weight-panel .updown .btn:hover{ background:#f5f5f5; }
 
 </style>
 </head>
@@ -254,15 +301,20 @@
   </div>
 </div>
 
-<div class="prob-panel" id="probPanel">
-  <h3>🎲 확률 조정</h3>
-  <div class="row"><label>꽝 확률(%)</label><input type="number" id="prob-miss" value="86"></div>
-  <div class="row"><label>치킨 x3 (%)</label><input type="number" id="prob-chicken" value="3"></div>
-  <div class="row"><label>커피 x3 (%)</label><input type="number" id="prob-coffee" value="3"></div>
-  <div class="row"><label>코인 x3 (%)</label><input type="number" id="prob-coin" value="4"></div>
-  <div class="row"><label>다혜 x3 (%)</label><input type="number" id="prob-dahye" value="1.5"></div>
-  <div class="row"><label>폭탄 x3 (%)</label><input type="number" id="prob-bomb" value="1.5"></div>
-  <div class="row"><label>7 x3 (%)</label><input type="number" id="prob-seven" value="1"></div>
+<!-- 가중치(칸 수) 패널 -->
+<div class="weight-panel" id="weightPanel">
+  <h3>슬롯머신 확률 (사용자 조정)</h3>
+  <div class="rows">
+    <!-- data-key 만 우리 심볼 키로 맞추면 됨 -->
+    <div class="row" data-key="miss"><span class="name">꽝</span><span class="wwrap"><span class="w">x1</span><div class="updown"><button class="btn plus">+</button><button class="btn minus">−</button></div></span><output class="pct">0%</output></div>
+    <div class="row" data-key="chicken"><span class="name">치킨</span><span class="wwrap"><span class="w">x1</span><div class="updown"><button class="btn plus">+</button><button class="btn minus">−</button></div></span><output class="pct">0%</output></div>
+    <div class="row" data-key="coffee"><span class="name">커피</span><span class="wwrap"><span class="w">x1</span><div class="updown"><button class="btn plus">+</button><button class="btn minus">−</button></div></span><output class="pct">0%</output></div>
+    <div class="row" data-key="coin"><span class="name">코인</span><span class="wwrap"><span class="w">x1</span><div class="updown"><button class="btn plus">+</button><button class="btn minus">−</button></div></span><output class="pct">0%</output></div>
+    <div class="row" data-key="dahye"><span class="name">다혜</span><span class="wwrap"><span class="w">x1</span><div class="updown"><button class="btn plus">+</button><button class="btn minus">−</button></div></span><output class="pct">0%</output></div>
+    <div class="row" data-key="bomb"><span class="name">폭탄</span><span class="wwrap"><span class="w">x1</span><div class="updown"><button class="btn plus">+</button><button class="btn minus">−</button></div></span><output class="pct">0%</output></div>
+    <div class="row" data-key="seven"><span class="name">7</span><span class="wwrap"><span class="w">x1</span><div class="updown"><button class="btn plus">+</button><button class="btn minus">−</button></div></span><output class="pct">0%</output></div>
+  </div>
+  <div class="help">Ait+클릭 ±100  /  Ctrl+클릭 ±10 / 클릭 ±1 </div>
 </div>
 
 <script>
@@ -546,90 +598,90 @@ window.addEventListener('load', () => {
   });
 });
 
-const fields = [
-  {id:'prob-miss', key:'miss'},
-  {id:'prob-chicken', key:'chicken'},
-  {id:'prob-coffee', key:'coffee'},
-  {id:'prob-coin', key:'coin'},
-  {id:'prob-dahye', key:'dahye'},
-  {id:'prob-bomb', key:'bomb'},
-  {id:'prob-seven', key:'seven'}
-];
+// --- 가중치 패널 로직 ---
+(function(){
+  const panel = document.getElementById('weightPanel');
+  if(!panel) return;
 
-fields.forEach(f=>{
-  const el = document.getElementById(f.id);
+  // 현재 weight 읽기
+  function readWeights(){
+    const rows = [...document.querySelectorAll('#weightPanel .row')];
+    const w = {};
+    rows.forEach(r=>{
+      const key = r.dataset.key;
+      const raw = r.querySelector('.w').textContent.trim();
+      const v = parseFloat(raw.replace(/[^\d.]/g, '')); // 'x113' -> 113
+      w[key] = isNaN(v) ? 0 : v;
+    });
+    return w;
+  }
 
-  // Enter 눌렀을 때만 보정 실행
-  el.addEventListener('keyup', e=>{
-    if(e.key === 'Enter'){
-      adjustProbs(f.key);  // 입력한 필드만 고정, 나머지 비율 조정
-      el.blur();           // 포커스 빼기(선택)
+  // weight → % 환산해서 UI/게임(dist)에 반영
+  function applyWeights(){
+    const rows = [...panel.querySelectorAll('.row')];
+    const w = readWeights();
+    let sum = Object.values(w).reduce((a,b)=>a+b,0);
+    if (sum <= 0) { sum = 1; w.miss = 1; }   // 0 분모 방지
+
+    // UI 표시 + dist 갱신(우리 슬롯 로직에 그대로 사용)
+    rows.forEach(r=>{
+      const key = r.dataset.key;
+      const pct = (w[key] / sum) * 100;
+      r.querySelector('.pct').value = (Math.round(pct*100)/100).toFixed(2) + '%';
+    });
+
+    // dist에 퍼센트 반영
+    dist.miss         = (w.miss    / sum) * 100;
+    dist.wins.chicken = (w.chicken / sum) * 100;
+    dist.wins.coffee  = (w.coffee  / sum) * 100;
+    dist.wins.coin    = (w.coin    / sum) * 100;
+    dist.wins.dahye   = (w.dahye   / sum) * 100;
+    dist.wins.bomb    = (w.bomb    / sum) * 100;
+    dist.wins.seven   = (w.seven   / sum) * 100;
+  }
+
+  // 버튼(+/–) 클릭 → 가중치 증감
+  panel.addEventListener('click', (e)=>{
+    const btn = e.target.closest('.btn');
+    if(!btn) return;
+    const row = btn.closest('.row');
+    const cell = row.querySelector('.w');
+
+    let step = 1;
+    if (e.altKey) step = 100;
+    else if (e.ctrlKey || e.metaKey) step = 10;
+
+    let v = parseFloat(cell.textContent.replace(/[^\d.]/g, "")) || 0;
+    if (btn.classList.contains('plus')) {
+      v += step;                      // 플러스면 증가
+    } else if (btn.classList.contains('minus')) {
+      v -= step;                      // 마이너스면 감소
+    }
+    if (v < 0) v = 0;
+
+    cell.textContent = "x" + v;
+    applyWeights();
+  });
+
+  // 가중치 숫자 직접 수정: Enter/blur 때 반영
+  panel.addEventListener('keydown', (e)=>{
+    if(e.key==='Enter' && e.target.classList.contains('w')){
+      e.preventDefault(); e.target.blur();
     }
   });
-});
+  panel.addEventListener('blur', (e)=>{
+    if(e.target.classList.contains('w')){
+      let v = parseFloat(e.target.textContent.trim());
+      if (isNaN(v) || v < 0) v = 0;
+      e.target.textContent = (Math.round(v*100)/100).toString();
+      applyWeights();
+    }
+  }, true);
 
-function adjustProbs(changedKey){
-  // 1) 현재 값 읽기
-  const arr = fields.map(f => ({
-    key: f.key,
-    el : document.getElementById(f.id),
-    val: parseFloat(document.getElementById(f.id).value)
-  })).map(x => ({ ...x, val: isNaN(x.val) ? 0 : x.val }));
-
-  // 2) 선택된 값 & 나머지
-  const changed = arr.find(x => x.key === changedKey);
-  const others  = arr.filter(x => x.key !== changedKey);
-
-  // 2-1) 입력값 범위 클램프 (즉시 UI 반영)
-  let changedVal = Math.max(0, Math.min(100, changed.val));
-  changed.val = changedVal;               // 내부 값 갱신
-  changed.el.value = changedVal.toFixed(2); // UI 즉시 고정
-
-  // 3) 나머지 합을 'remain'에 맞추도록 비례 스케일
-  let sumOthers = others.reduce((a,b)=>a + b.val, 0);
-  const remain  = 100 - changedVal;
-
-  if (others.length === 0){
-    // 항목이 1개뿐이면 그대로 끝
-  } else if (sumOthers <= 0){
-    // 나머지가 전부 0이거나 음수면 균등 분배
-    const per = remain / others.length;
-    others.forEach(o => { o.val = Math.max(0, per); });
-  } else {
-    const ratio = remain / sumOthers;  // remain이 작으면 축소, 크면 확대
-    others.forEach(o => { o.val = Math.max(0, o.val * ratio); });
-  }
-
-  // 4) 반올림 후 총합 100%로 미세 보정(부동소수/반올림 오차 제거)
-  //    - 가장 값이 큰 항목(보통 miss)에 델타를 몰아준다.
-  const after = [changed, ...others];
-  // 표시용으로 먼저 반올림
-  after.forEach(o => o.el.value = o.val.toFixed(2));
-  // 실제 값은 소수 그대로 가지고 총합 보정
-  let total = after.reduce((a,b)=>a + b.val, 0);
-  const delta = 100 - total;                 // 남거나 모자란 양
-  if (Math.abs(delta) > 1e-9){
-    // 보정 대상: 가장 큰 값(없으면 첫 번째)
-    let target = after.reduce((m, x) => x.val > m.val ? x : m, after[0]);
-    target.val = Math.max(0, target.val + delta);
-    target.el.value = target.val.toFixed(2);
-  }
-
-  // 5) dist 갱신
-  updateDistFromArray(after);
-}
-
-function updateDistFromArray(arr){
-  dist.miss         = arr.find(x=>x.key==='miss').val;
-  dist.wins.chicken = arr.find(x=>x.key==='chicken').val;
-  dist.wins.coffee  = arr.find(x=>x.key==='coffee').val;
-  dist.wins.coin    = arr.find(x=>x.key==='coin').val;
-  dist.wins.dahye   = arr.find(x=>x.key==='dahye').val;
-  dist.wins.bomb    = arr.find(x=>x.key==='bomb').val;
-  dist.wins.seven   = arr.find(x=>x.key==='seven').val;
-}
+  // 초기 1회 반영
+  applyWeights();
+})();
 
 </script>
 </body>
 </html>
-
